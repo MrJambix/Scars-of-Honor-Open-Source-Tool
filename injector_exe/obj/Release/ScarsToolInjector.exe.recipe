@@ -2,10 +2,10 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>c:\Users\mrjam\OneDrive\Desktop\TheHub\ScarsTool\injector_exe\ScarsTool.dll</FullPath>
+      <FullPath>C:\Users\mrjam\OneDrive\Desktop\TheHub\ScarsTool\injector_exe\ScarsTool.dll</FullPath>
     </ProjectOutput>
     <ProjectOutput>
-      <FullPath>c:\Users\mrjam\OneDrive\Desktop\TheHub\ScarsTool\injector_exe\ScarsToolInjector.exe</FullPath>
+      <FullPath>C:\Users\mrjam\OneDrive\Desktop\TheHub\ScarsTool\injector_exe\ScarsToolInjector.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />
