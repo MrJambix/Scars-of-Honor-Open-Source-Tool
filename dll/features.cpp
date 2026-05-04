@@ -15,6 +15,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cstdio>
+#include <cstdarg>
 #include <cstring>
 #include <cmath>
 #include <vector>
@@ -24,6 +25,7 @@
 #include "il2cpp_helpers.h"
 #include "game.h"
 #include "log.h"
+#include "ipc.h"
 #include "vendor/imgui/imgui.h"
 
 using namespace il2cpp_helpers;
@@ -79,9 +81,11 @@ public:
     Il2CppClass*       clsView      = nullptr;
     Il2CppClass*       clsRect      = nullptr;
     Il2CppClass*       clsComponent = nullptr;
+    Il2CppClass*       clsGameObject= nullptr;
     const MethodInfo*  mAnchored    = nullptr;   // RectTransform.get_anchoredPosition
     const MethodInfo*  mSizeDelta   = nullptr;   // RectTransform.get_sizeDelta
     const MethodInfo*  mGetTransform= nullptr;   // Component.get_transform
+    const MethodInfo*  mGoGetTransform = nullptr; // GameObject.get_transform (fallback)
 
     // ── Sample state ──
     DWORD  lastTick   = 0;
@@ -95,19 +99,83 @@ public:
     Sample latest;
 
     // Field offsets (Code.Core.dll, verified)
+    static constexpr size_t kView_HandleObject   = 0x80;  // GameObject (always populated)
     static constexpr size_t kView_HitZoneImage   = 0x90;  // UI.Image
     static constexpr size_t kView_CritZoneImage  = 0x98;  // UI.Image
-    static constexpr size_t kView_HandleRect     = 0xB8;  // RectTransform
+    static constexpr size_t kView_HandleRect     = 0xB8;  // RectTransform (lazy)
 
     void OnInit() override {
         clsView      = FindClass("World.MiniGame.UI", "UiViewMiniGameMining");
         clsRect      = FindClass("UnityEngine", "RectTransform");
         clsComponent = FindClass("UnityEngine", "Component");
+        clsGameObject= FindClass("UnityEngine", "GameObject");
         if (clsRect) {
             mAnchored  = GetMethod(clsRect, "get_anchoredPosition", 0);
             mSizeDelta = GetMethod(clsRect, "get_sizeDelta",        0);
         }
-        if (clsComponent) mGetTransform = GetMethod(clsComponent, "get_transform", 0);
+        if (clsComponent)  mGetTransform   = GetMethod(clsComponent,  "get_transform", 0);
+        if (clsGameObject) mGoGetTransform = GetMethod(clsGameObject, "get_transform", 0);
+
+        // Live diagnostics: register an IPC handler that returns a JSON dump of
+        // every internal piece of state the helper sees this frame.  Runs on
+        // the main thread because it touches IL2CPP managed objects.
+        ipc::Register("mining-probe", [this](const std::string&, std::string& out) {
+            char b[2048]; size_t off = 0;
+            auto put = [&](const char* fmt, ...) {
+                va_list va; va_start(va, fmt);
+                int n = _vsnprintf_s(b + off, sizeof(b) - off, _TRUNCATE, fmt, va);
+                va_end(va);
+                if (n > 0) off += (size_t)n;
+            };
+
+            put("{\"clsView\":\"%p\",\"clsRect\":\"%p\",\"mAnchored\":\"%p\",\"mSizeDelta\":\"%p\",\"mGetTransform\":\"%p\"",
+                (void*)clsView, (void*)clsRect, (void*)mAnchored, (void*)mSizeDelta, (void*)mGetTransform);
+
+            // Force a fresh resolve and report ALL candidate views.
+            uint32_t candidateCount = 0;
+            void* arr = clsView ? FindObjectsOfTypeCached(clsView, candidateCount, 0) : nullptr;
+            put(",\"candidateCount\":%u", candidateCount);
+            put(",\"candidates\":[");
+            if (arr && candidateCount) {
+                void** elems = reinterpret_cast<void**>((char*)arr + 0x20);
+                uint32_t lim = candidateCount > 8 ? 8 : candidateCount;
+                for (uint32_t i = 0; i < lim; i++) {
+                    put("%s\"%p\"", i ? "," : "", elems[i]);
+                }
+            }
+            put("]");
+
+            // Re-run a sample fresh, with full breakdown of each step.
+            cachedView = nullptr; lastResolveTick = 0;   // bypass throttle
+            Sample s = Sample_();
+            put(",\"chosenView\":\"%p\"", cachedView);
+
+            // Also peek at the raw inner pointers we deref off the view.
+            void* handleRect = nullptr; void* handleGo = nullptr;
+            void* hitImg = nullptr; void* critImg = nullptr;
+            if (cachedView) {
+                handleRect = *reinterpret_cast<void**>((char*)cachedView + kView_HandleRect);
+                handleGo   = *reinterpret_cast<void**>((char*)cachedView + kView_HandleObject);
+                hitImg     = *reinterpret_cast<void**>((char*)cachedView + kView_HitZoneImage);
+                critImg    = *reinterpret_cast<void**>((char*)cachedView + kView_CritZoneImage);
+            }
+            put(",\"handleObject\":\"%p\",\"handleRect\":\"%p\",\"hitImg\":\"%p\",\"critImg\":\"%p\"",
+                handleGo, handleRect, hitImg, critImg);
+
+            put(",\"sample\":{\"ok\":%s,\"err\":\"%s\",\"x\":%.3f,\"vel\":%.3f,\"crit\":%.3f,\"hit\":%.3f,\"critZone\":%.3f}",
+                s.ok ? "true" : "false",
+                s.err ? s.err : "",
+                s.x, s.vel, s.crit, s.hit, s.critZone);
+
+            put(",\"showVisual\":%s,\"autoPress\":%s,\"enabled\":%s,\"predictMs\":%.1f,\"inputMode\":%d",
+                showVisual ? "true" : "false",
+                autoPress ? "true" : "false",
+                Enabled() ? "true" : "false",
+                predictMs, inputMode);
+
+            put("}");
+            out.assign(b, off);
+        }, /*runOnMainThread=*/true);
     }
 
     // Read a Vector2 from a 0-arg getter on the given object (e.g. RectTransform).
@@ -151,9 +219,20 @@ public:
         void* view = cachedView;
         if (!view) { s.err = "view not active"; return s; }
 
-        // Read handle position
+        // Read handle position.  The dedicated `_handleRectTransform` field
+        // (0xB8) is wired lazily by the game (Awake / round start) -- if it's
+        // still null we fall back to the always-populated `_handleObject`
+        // GameObject and ask it for its transform (which IS a RectTransform
+        // for any UI element).
         void* handleRect = *reinterpret_cast<void**>((char*)view + kView_HandleRect);
-        if (!handleRect) { s.err = "handleRect null"; return s; }
+        if (!handleRect && mGoGetTransform) {
+            void* handleGo = *reinterpret_cast<void**>((char*)view + kView_HandleObject);
+            if (handleGo) {
+                __try { handleRect = Invoke(mGoGetTransform, handleGo, nullptr); }
+                __except (EXCEPTION_EXECUTE_HANDLER) { handleRect = nullptr; }
+            }
+        }
+        if (!handleRect) { s.err = "handleRect null (no _handleObject either)"; return s; }
         float hX = 0, hY = 0;
         if (!ReadVector2(mAnchored, handleRect, hX, hY)) { s.err = "read handle"; return s; }
 
@@ -481,7 +560,7 @@ public:
 
         cached.clear();
         uint32_t n = 0;
-        void* arr = FindObjectsOfType(lastCls, n);
+        void* arr = FindObjectsOfTypeCached(lastCls, n, 250);
         if (!arr) return;
         void** elems = reinterpret_cast<void**>((char*)arr + 0x20);
         int limit = (int)n < maxDraw ? (int)n : maxDraw;
@@ -489,6 +568,7 @@ public:
         for (int i = 0; i < limit; i++) {
             game::WorldEntity we{};
             we.obj = elems[i];
+            if (!game::IsLikelyAlive(we.obj)) continue;   // skip freed slots
             if (!game::GetTransformPosition(we.obj, we.worldPos)) continue;
             _snprintf_s(we.label, sizeof(we.label), _TRUNCATE, "%s#%d", name, i);
             cached.push_back(we);

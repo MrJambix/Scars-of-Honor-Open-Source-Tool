@@ -96,6 +96,8 @@
     <ClCompile Include="game_api.cpp" />
     <ClCompile Include="game_api_inspector.cpp" />
     <ClCompile Include="features_combat.cpp" />
+    <ClCompile Include="crash_guard.cpp" />
+    <ClCompile Include="ipc.cpp" />
     <!-- ImGui core -->
     <ClCompile Include="vendor\imgui\imgui.cpp" />
     <ClCompile Include="vendor\imgui\imgui_demo.cpp" />
@@ -116,6 +118,8 @@
     <ClInclude Include="overlay.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="sdk_dumper.h" />
+    <ClInclude Include="crash_guard.h" />
+    <ClInclude Include="ipc.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

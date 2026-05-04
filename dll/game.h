@@ -67,6 +67,13 @@ void* EntitiesManagerInst();    // Entities.EntitiesManager* or null
 bool  GetPlayerPosition(Vec3& out);
 bool  GetTransformPosition(void* unityComponent, Vec3& out);
 
+// Heuristic liveness check for an IL2CPP managed pointer obtained from an
+// older snapshot (e.g. a cached FindObjectsOfType<T> result).  Returns true
+// only when the first 8 bytes look like a valid Il2CppClass* into mapped
+// memory.  Use this BEFORE any deref on cached element pointers to avoid
+// faulting on use-after-free slots Unity poisoned with 0xFF...FF.
+bool  IsLikelyAlive(void* managedObj);
+
 // ── Speed control ──────────────────────────────────────────────────────────
 struct SpeedTweak {
     bool  lockBase    = false;  bool  lockCurrent = false;

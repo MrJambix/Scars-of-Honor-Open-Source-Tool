@@ -9,6 +9,7 @@
 #include <atomic>
 
 #include "renderer.h"
+#include "crash_guard.h"
 #include "vendor/minhook/include/MinHook.h"
 #include "vendor/imgui/imgui.h"
 #include "vendor/imgui/backends/imgui_impl_dx11.h"
@@ -73,12 +74,13 @@ static LRESULT CALLBACK HookedWndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
         ImGui_ImplWin32_WndProcHandler(hWnd, msg, wp, lp);
         ImGuiIO& io = ImGui::GetIO();
 
-        // While the overlay is visible, swallow ALL input the game would
-        // otherwise see — Unity uses WM_INPUT (raw input) for camera/look,
-        // and ClipCursor() to recapture the mouse, which fights ImGui.
+        // Only steal input the user is actually directing at the overlay.
+        // Anything ImGui doesn't want goes through to the game so the player
+        // can keep playing (camera, movement, hotkeys) while the overlay is
+        // visible.
         switch (msg) {
-            // Mouse
-            case WM_MOUSEMOVE: case WM_NCMOUSEMOVE:
+            // Mouse buttons / wheel: swallow only when the cursor is over
+            // an ImGui window OR a widget is being actively dragged.
             case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_LBUTTONDBLCLK:
             case WM_RBUTTONDOWN: case WM_RBUTTONUP: case WM_RBUTTONDBLCLK:
             case WM_MBUTTONDOWN: case WM_MBUTTONUP: case WM_MBUTTONDBLCLK:
@@ -86,23 +88,41 @@ static LRESULT CALLBACK HookedWndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
             case WM_MOUSEWHEEL:  case WM_MOUSEHWHEEL:
                 if (io.WantCaptureMouse) return 0;
                 break;
-            // Keyboard
+
+            // Plain mouse motion: never swallow.  ImGui reads it from
+            // GetCursorPos() in NewFrame, the game uses it for its own UI
+            // hover.  Letting it through fixes "camera frozen" while overlay
+            // is up.
+            case WM_MOUSEMOVE: case WM_NCMOUSEMOVE:
+                break;
+
+            // Keyboard: only steal it when ImGui has focus on a text box,
+            // or its nav system is currently capturing.  This lets WASD /
+            // hotkeys reach the game.
             case WM_KEYDOWN: case WM_KEYUP:
             case WM_SYSKEYDOWN: case WM_SYSKEYUP:
+                if (io.WantTextInput) return 0;
+                break;
             case WM_CHAR: case WM_DEADCHAR:
             case WM_SYSCHAR: case WM_SYSDEADCHAR:
-                if (io.WantCaptureKeyboard || io.WantTextInput) return 0;
+                if (io.WantTextInput) return 0;
                 break;
-            // Raw input — Unity reads mouse delta from this. Always drop it
-            // while the overlay is up, otherwise the game keeps turning the
-            // camera while you try to drag a slider.
+
+            // Raw input — Unity reads camera-look delta from this.  Only
+            // block it when ImGui actively wants the mouse (e.g. dragging
+            // a slider) so look/aim keeps working everywhere else.
             case WM_INPUT:
-                return 0;
-            // Activation / focus — let ImGui see them but don't pass through
-            // SETCURSOR (the game forces an invisible cursor).
+                if (io.WantCaptureMouse) return 0;
+                break;
+
+            // Cursor: force a visible arrow only when over ImGui; otherwise
+            // let the game restore its own (invisible) cursor for camera.
             case WM_SETCURSOR: {
-                SetCursor(LoadCursorW(nullptr, IDC_ARROW));
-                return TRUE;
+                if (io.WantCaptureMouse) {
+                    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+                    return TRUE;
+                }
+                break;
             }
         }
     }
@@ -148,8 +168,10 @@ static HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* sc, UINT syncInte
     }
 
     if (g_initOK.load() && g_visible.load() && g_rtv) {
-        // Unity re-clips the cursor every frame; undo it while we're up so
-        // the user can actually move into our windows.
+        // Unity re-clips the cursor every frame; undo it while overlay is
+        // up so the user can move into our windows.  Input pass-through is
+        // handled in HookedWndProc -- only ImGui-targeted clicks/keys are
+        // swallowed there, so the game still gets WASD / camera-look.
         ClipCursor(nullptr);
 
         ImGui_ImplDX11_NewFrame();
@@ -158,7 +180,9 @@ static HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* sc, UINT syncInte
 
         if (g_frameCb) {
             __try { g_frameCb(); }
-            __except (EXCEPTION_EXECUTE_HANDLER) { /* swallow per-frame UI faults */ }
+            __except (EXCEPTION_EXECUTE_HANDLER) {
+                crash_guard::NotifySwallowed("renderer.frameCb", GetExceptionCode());
+            }
         }
 
         ImGui::Render();
@@ -171,7 +195,9 @@ static HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* sc, UINT syncInte
     // out of the way.  No ImGui frame is open here.
     if (g_initOK.load() && g_tickCb) {
         __try { g_tickCb(); }
-        __except (EXCEPTION_EXECUTE_HANDLER) { /* swallow */ }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            crash_guard::NotifySwallowed("renderer.tickCb", GetExceptionCode());
+        }
     }
 
     return g_origPresent(sc, syncInterval, flags);

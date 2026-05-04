@@ -18,6 +18,8 @@
 #include "overlay.h"
 #include "log.h"
 #include "game_api.h"
+#include "crash_guard.h"
+#include "ipc.h"
 
 #pragma comment(lib, "psapi.lib")
 
@@ -84,6 +86,7 @@ static void PrintModuleInfo(const char* label, HMODULE h) {
 static DWORD WINAPI PayloadThread(LPVOID) {
     OpenConsole();
     logx::Init();
+    crash_guard::Install();
     LOGI("payload boot, PID=%u", GetCurrentProcessId());    printf("\n");
     printf("  ============================================================\n");
     printf("    ScarsTool payload v1.0  -  loaded into PID %u\n", GetCurrentProcessId());
@@ -132,13 +135,18 @@ static DWORD WINAPI PayloadThread(LPVOID) {
     overlay::Init();
     if (renderer::Install()) {
         renderer::SetFrameCallback([] { overlay::Render(); });
-        renderer::SetTickCallback ([] { overlay::Tick();   });
+        renderer::SetTickCallback ([] { overlay::Tick(); ipc::Pump(); });
         LOGI("overlay armed (press INSERT in-game)");
         printf("  [+] Overlay armed.  Press INSERT in-game.\n");
     } else {
         LOGE("overlay install failed");
         printf("  [-] Overlay install failed; F8 dump still works.\n");
     }
+
+    // Start the named-pipe diagnostics bridge AFTER overlay is up so Pump()
+    // has a place to run.  Mining Helper / others register handlers in OnInit.
+    ipc::Install();
+    LOGI("ipc bridge listening on \\\\.\\pipe\\ScarsTool");
 
     // Idle loop - F8 triggers another dump.
     bool prevDown = false;
@@ -174,8 +182,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/) {
         }
         break;
     case DLL_PROCESS_DETACH:
+        ipc::Shutdown();
         renderer::Uninstall();
         overlay::Shutdown();
+        crash_guard::Uninstall();
         CloseConsoleSafely();
         break;
     }

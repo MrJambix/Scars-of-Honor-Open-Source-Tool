@@ -10,6 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 #include "pipeline.h"
 #include "log.h"
+#include "crash_guard.h"
 #include "vendor/imgui/imgui.h"
 #include <windows.h>
 #include <unordered_map>
@@ -40,6 +41,10 @@ struct Stat {
     double   lastRenderMs = 0.0;
     double   peakRenderMs = 0.0;
     bool     killed       = false;
+    // Adaptive backoff: when a feature's OnTick blows the per-frame budget
+    // we postpone its next tick to keep the render thread responsive.
+    DWORD    nextTickAt   = 0;     // GetTickCount() gate
+    DWORD    backoffMs    = 0;     // current backoff window (0 = no backoff)
 };
 static std::unordered_map<Feature*, Stat>& Stats() {
     static std::unordered_map<Feature*, Stat> g; return g;
@@ -48,6 +53,16 @@ static std::unordered_map<Feature*, Stat>& Stats() {
 static constexpr uint32_t kCrashKillThreshold = 3;
 static constexpr double   kSlowTickMsBudget   = 4.0;
 static constexpr double   kSlowRenderMsBudget = 6.0;
+
+// Maximum cumulative time we let TickAll() consume on a single render-thread
+// frame.  Beyond this we defer the remaining features round-robin to the
+// next frame so we never compound feature spikes into a visible hitch.
+static constexpr double   kFrameTickBudgetMs  = 6.0;
+
+// Adaptive backoff bounds for features whose individual OnTick blew the
+// budget.  We double on every overrun and reset on a clean tick.
+static constexpr DWORD    kBackoffMinMs       = 50;
+static constexpr DWORD    kBackoffMaxMs       = 1000;
 
 static double NowMs() {
     static LARGE_INTEGER freq{};
@@ -97,6 +112,7 @@ static void RunGuarded(Feature* f, VoidThunk thunk, const char* phase,
 
     if (ec) {
         st.crashes++;
+        crash_guard::NotifySwallowed(f->Name(), ec);
         LOGE("[%s] EXCEPTION 0x%08lX in %s (count=%u)",
              f->Name(), ec, phase, st.crashes);
         if (st.crashes >= kCrashKillThreshold) {
@@ -128,12 +144,53 @@ void InitAll() {
 }
 
 void TickAll() {
-    for (auto* f : Registry()) {
+    // Round-robin start index so a heavy feature near the front of the list
+    // can't permanently starve features behind it when we hit the per-frame
+    // budget cap.
+    static size_t s_rrCursor = 0;
+    const auto& reg = Registry();
+    if (reg.empty()) return;
+
+    DWORD now = GetTickCount();
+    double frameStart = NowMs();
+    size_t n = reg.size();
+    size_t startIdx = s_rrCursor % n;
+
+    for (size_t i = 0; i < n; i++) {
+        size_t idx = (startIdx + i) % n;
+        Feature* f = reg[idx];
         if (!f->Enabled()) continue;
         Stat& st = Stats()[f];
+        if (st.killed) continue;
+
+        // Frame budget: if we've already burned through the per-frame ms
+        // budget, defer the rest to next frame starting from this index.
+        double spent = NowMs() - frameStart;
+        if (spent > kFrameTickBudgetMs) {
+            s_rrCursor = idx;          // resume here next frame
+            return;
+        }
+
+        // Per-feature backoff window after a blown OnTick.
+        if (st.nextTickAt && now < st.nextTickAt) continue;
+
         RunGuarded(f, &DoTick, "OnTick", kSlowTickMsBudget, st.lastTickMs);
         if (st.lastTickMs > st.peakTickMs) st.peakTickMs = st.lastTickMs;
+
+        // Adapt: blown budget -> grow backoff window (1.5x), clean -> reset.
+        if (st.lastTickMs > kSlowTickMsBudget) {
+            DWORD prev = st.backoffMs ? st.backoffMs : kBackoffMinMs;
+            DWORD next = prev + (prev >> 1);   // *1.5
+            if (next > kBackoffMaxMs) next = kBackoffMaxMs;
+            st.backoffMs  = next;
+            st.nextTickAt = now + next;
+        } else {
+            st.backoffMs  = 0;
+            st.nextTickAt = 0;
+        }
     }
+    // Full sweep completed -- advance cursor so next frame starts further on.
+    s_rrCursor = (startIdx + 1) % n;
 }
 
 void RenderWorldAll() {

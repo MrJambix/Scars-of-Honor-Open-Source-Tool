@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 #include "il2cpp_helpers.h"
 #include "renderer.h"
+#include "crash_guard.h"
 #include <cstdio>
 #include <cstring>
 #include <unordered_map>
@@ -228,6 +229,9 @@ static void* MakeSystemType(Il2CppClass* cls) {
 
     // Path 2: type_get_object + offset-based Il2CppType* read.
     if (a.type_get_object && g_mGetTypeFromHandle) {
+        // These reads deliberately probe layout offsets that may be invalid;
+        // suppress VEH logging while we sniff so the log stays clean.
+        crash_guard::QuietBegin();
         for (size_t off : { (size_t)0xF8, (size_t)0xC8, (size_t)0xD0, (size_t)0xE0,
                             (size_t)0xE8, (size_t)0xF0, (size_t)0x100 }) {
             const Il2CppType* t = nullptr;
@@ -236,12 +240,14 @@ static void* MakeSystemType(Il2CppClass* cls) {
                         reinterpret_cast<const char*>(cls) + off);
             } __except (EXCEPTION_EXECUTE_HANDLER) { t = nullptr; }
             if (!t) continue;
-            if (void* sysType = a.type_get_object(t)) return sysType;
+            if (void* sysType = a.type_get_object(t)) { crash_guard::QuietEnd(); return sysType; }
         }
+        crash_guard::QuietEnd();
     }
 
     // Path 3: GetTypeFromHandle.
     if (g_mGetTypeFromHandle) {
+        crash_guard::QuietBegin();
         for (size_t off : { (size_t)0xF8, (size_t)0xC8, (size_t)0xD0, (size_t)0xE0,
                             (size_t)0xE8, (size_t)0xF0, (size_t)0x100 }) {
             const Il2CppType* t = nullptr;
@@ -251,8 +257,12 @@ static void* MakeSystemType(Il2CppClass* cls) {
             } __except (EXCEPTION_EXECUTE_HANDLER) { t = nullptr; }
             if (!t) continue;
             void* args[1] = { (void*)&t };
-            if (void* sysType = Invoke(g_mGetTypeFromHandle, nullptr, args)) return sysType;
+            if (void* sysType = Invoke(g_mGetTypeFromHandle, nullptr, args)) {
+                crash_guard::QuietEnd();
+                return sysType;
+            }
         }
+        crash_guard::QuietEnd();
     }
     return nullptr;
 }
@@ -271,9 +281,44 @@ void* FindObjectsOfType(Il2CppClass* unityType, uint32_t& outCount) {
     return arr;
 }
 
-void* FindFirstObjectOfType(Il2CppClass* unityType) {
+// Per-class TTL cache.  We deliberately stash the IL2CPP array pointer; this
+// is a managed array so it is GC-rooted by FindObjectsOfType<T> only for the
+// duration of the current frame in theory -- but in practice the runtime
+// keeps these alive long enough that a sub-second cache hit is safe and
+// reading already-freed-but-still-mapped IL2CPP heap is not a crash risk
+// (it would just give us stale pointers, which we already SEH-guard at the
+// call sites).
+struct CachedQuery {
+    void*    arr      = nullptr;
+    uint32_t count    = 0;
+    DWORD    stampMs  = 0;
+};
+static std::unordered_map<Il2CppClass*, CachedQuery> g_findCache;
+
+void* FindObjectsOfTypeCached(Il2CppClass* unityType, uint32_t& outCount,
+                              unsigned long ttlMs) {
+    outCount = 0;
+    if (!unityType) return nullptr;
+    DWORD now = GetTickCount();
+    auto it = g_findCache.find(unityType);
+    if (it != g_findCache.end() && (now - it->second.stampMs) < ttlMs) {
+        outCount = it->second.count;
+        return it->second.arr;
+    }
     uint32_t n = 0;
     void* arr = FindObjectsOfType(unityType, n);
+    CachedQuery& c = g_findCache[unityType];
+    c.arr     = arr;
+    c.count   = n;
+    c.stampMs = now;
+    outCount  = n;
+    return arr;
+}
+
+void* FindFirstObjectOfType(Il2CppClass* unityType) {
+    uint32_t n = 0;
+    // Route through the TTL cache: most callers hit this every tick.
+    void* arr = FindObjectsOfTypeCached(unityType, n, 250);
     if (!arr || n == 0) return nullptr;
     // IL2CPP arrays: header is 0x20 bytes on x64, then elements.
     void** elems = reinterpret_cast<void**>(reinterpret_cast<char*>(arr) + 0x20);

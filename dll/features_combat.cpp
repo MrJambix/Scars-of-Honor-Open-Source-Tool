@@ -638,7 +638,9 @@ public:
         uint32_t writes = 0;
         __try {
             uint32_t n = 0;
-            void* arr = FindObjectsOfType(A.resourcesComponent.cls, n);
+            // Cached: lots of features ask for ResourcesComponent within the
+            // same frame -- share one FindObjectsOfType call across them.
+            void* arr = FindObjectsOfTypeCached(A.resourcesComponent.cls, n, 200);
             if (!arr || n == 0) {
                 _snprintf_s(m_status, _TRUNCATE, "no ResourcesComponent in scene");
                 m_lastWrites = 0;
@@ -647,12 +649,12 @@ public:
             void** elems = reinterpret_cast<void**>((char*)arr + A.fld_Array_data);
             for (uint32_t i = 0; i < n; i++) {
                 void* rc = elems[i];
-                if (!rc) continue;
+                if (!game::IsLikelyAlive(rc)) continue;   // skip freed/poisoned slots
                 void* unit = *(void**)((uint8_t*)rc + A.fld_RC_unit);
                 if (unit != player) continue;
 
                 void* list = *(void**)((uint8_t*)rc + A.fld_RC_resources);
-                if (!list) continue;
+                if (!game::IsLikelyAlive(list)) continue;
                 void* itemsArr = *(void**)((uint8_t*)list + A.fld_List_items);
                 int   size     = *(int*)  ((uint8_t*)list + A.fld_List_size);
                 if (!itemsArr || size <= 0 || size > 64) continue;
@@ -740,7 +742,7 @@ public:
         uint32_t writes = 0;
         __try {
             uint32_t n = 0;
-            void* arr = FindObjectsOfType(A.talentsModelSO.cls, n);
+            void* arr = FindObjectsOfTypeCached(A.talentsModelSO.cls, n, 500);
             if (!arr || n == 0) {
                 _snprintf_s(m_status, _TRUNCATE, "no UiDataTalentsModelSO in scene");
                 m_lastWrites = 0;
@@ -750,7 +752,7 @@ public:
             uint32_t target = (uint32_t)(m_target < 0 ? 0 : m_target);
             for (uint32_t i = 0; i < n; i++) {
                 void* m = elems[i];
-                if (!m) continue;
+                if (!game::IsLikelyAlive(m)) continue;   // skip freed slots
                 uint32_t cur = *(uint32_t*)((uint8_t*)m + A.fld_Talents_available);
                 if (cur < target) {
                     *(uint32_t*)((uint8_t*)m + A.fld_Talents_available) = target;
@@ -926,7 +928,8 @@ public:
     GodModeFeature() : Feature("God Mode (HP refill)", pipeline::Category::Combat, false) {}
 
     bool     m_allUnits   = false;
-    int      m_intervalMs = 0;     // 0 = every frame
+    int      m_intervalMs = 100;   // 0 = every frame; default 10 Hz to keep
+                                   // FindObjectsOfType off the hot path.
     DWORD    m_nextTick   = 0;
     uint32_t m_lastWrites = 0;
     uint64_t m_totalWrites= 0;
@@ -954,7 +957,7 @@ public:
         uint32_t writes = 0;
         __try {
             uint32_t n = 0;
-            void* arr = FindObjectsOfType(A.resourcesComponent.cls, n);
+            void* arr = FindObjectsOfTypeCached(A.resourcesComponent.cls, n, 200);
             if (!arr || n == 0) {
                 _snprintf_s(m_status, _TRUNCATE, "no ResourcesComponent in scene");
                 m_lastWrites = 0;
@@ -963,13 +966,13 @@ public:
             void** elems = reinterpret_cast<void**>((char*)arr + A.fld_Array_data);
             for (uint32_t i = 0; i < n; i++) {
                 void* rc = elems[i];
-                if (!rc) continue;
+                if (!game::IsLikelyAlive(rc)) continue;   // skip freed slots
                 if (!m_allUnits) {
                     void* unit = *(void**)((uint8_t*)rc + A.fld_RC_unit);
                     if (unit != player) continue;
                 }
                 void* list = *(void**)((uint8_t*)rc + A.fld_RC_resources);
-                if (!list) continue;
+                if (!game::IsLikelyAlive(list)) continue;
                 void* itemsArr = *(void**)((uint8_t*)list + A.fld_List_items);
                 int   size     = *(int*)  ((uint8_t*)list + A.fld_List_size);
                 if (!itemsArr || size <= 0 || size > 64) continue;

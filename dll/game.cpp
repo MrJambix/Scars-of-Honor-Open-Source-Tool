@@ -147,6 +147,14 @@ static bool LooksLikeManagedObject(void* obj) {
     return true;
 }
 
+// Public alias — exposed so feature code can validate cached pointers.
+bool IsLikelyAlive(void* managedObj) {
+    // Reject Unity's freed-slot poison bit pattern outright (cheap fast path).
+    if (!managedObj) return false;
+    if (reinterpret_cast<uintptr_t>(managedObj) == 0xFFFFFFFFFFFFFFFFull) return false;
+    return LooksLikeManagedObject(managedObj);
+}
+
 static bool SafeWriteFloat(void* obj, size_t offset, float value) {
     void* addr = reinterpret_cast<char*>(obj) + offset;
     if (!IsValidWritable(addr, sizeof(float))) return false;
@@ -195,14 +203,16 @@ static void EnumerateOfType(Il2CppClass* cls, int max,
     out.clear();
     if (!cls) return;
     uint32_t n = 0;
-    void* arr = FindObjectsOfType(cls, n);
+    // Use the shared TTL cache so multiple ESP features asking for the same
+    // type within a frame don't each pay for a full FindObjectsOfType.
+    void* arr = il2cpp_helpers::FindObjectsOfTypeCached(cls, n, 250);
     if (!arr || n == 0) return;
     void** elems = reinterpret_cast<void**>(reinterpret_cast<char*>(arr) + 0x20);
     int limit = (int)n < max ? (int)n : max;
     out.reserve(limit);
     for (int i = 0; i < limit; i++) {
         void* o = elems[i];
-        if (!o) continue;
+        if (!IsLikelyAlive(o)) continue;   // skip use-after-free poisoned slots
         WorldEntity we{};
         we.obj = o;
         if (!GetTransformPosition(o, we.worldPos)) continue;

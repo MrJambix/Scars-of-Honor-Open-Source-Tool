@@ -73,6 +73,13 @@ bool  WorldToScreen(void* camera, const Vec3& worldPos, Vec2& outScreen);
 // Caller must NOT free the array.
 void* FindObjectsOfType(Il2CppClass* unityType, uint32_t& outCount);
 
+// Cached variant: returns the most recent FindObjectsOfType<T> result if it
+// is younger than ttlMs, otherwise re-queries.  This is the recommended
+// entry point for per-frame / per-tick consumers since several pipelines
+// usually want the same type within a few ms of each other.
+void* FindObjectsOfTypeCached(Il2CppClass* unityType, uint32_t& outCount,
+                              unsigned long ttlMs = 200);
+
 // Read the first instance of the given Unity component type, or null.
 void* FindFirstObjectOfType(Il2CppClass* unityType);
 
