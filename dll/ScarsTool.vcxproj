@@ -93,6 +93,9 @@
     <ClCompile Include="sdk_dumper.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="patches.cpp" />
+    <ClCompile Include="game_api.cpp" />
+    <ClCompile Include="game_api_inspector.cpp" />
+    <ClCompile Include="features_combat.cpp" />
     <!-- ImGui core -->
     <ClCompile Include="vendor\imgui\imgui.cpp" />
     <ClCompile Include="vendor\imgui\imgui_demo.cpp" />

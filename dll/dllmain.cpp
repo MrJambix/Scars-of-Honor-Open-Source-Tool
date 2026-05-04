@@ -17,6 +17,7 @@
 #include "renderer.h"
 #include "overlay.h"
 #include "log.h"
+#include "game_api.h"
 
 #pragma comment(lib, "psapi.lib")
 
@@ -119,6 +120,9 @@ static DWORD WINAPI PayloadThread(LPVOID) {
     // Wait a few seconds for the runtime to finish initializing assemblies.
     printf("  [*] Waiting 5s for IL2CPP runtime to settle...\n");
     Sleep(5000);
+
+    // Resolve the central game-API registry now that IL2CPP is up.
+    gameapi::Resolve();
 
     printf("\n  [*] INSERT  in the game window to toggle the dev overlay.\n");
     printf("  [*] F8      to dump the SDK (also available from the overlay).\n");

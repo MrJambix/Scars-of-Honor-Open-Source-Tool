@@ -73,6 +73,14 @@ struct GameAPI {
     MethodSym MasterAnim_get_SpeedMultiplier;
     ClassSym  masterAnimController;         // Entities.MasterAnimatorController
 
+    // Live stats (Unit base) -- HP/Mana/regen/etc.
+    MethodSym Unit_GetStatAmount;           // (Defines.Stat) -> Single
+    MethodSym Unit_IsAlive;                 // () -> bool
+    MethodSym Unit_IsDead;                  // () -> bool
+    MethodSym Unit_get_IsInCombat;          // () -> bool
+    MethodSym Unit_get_CombatComponent;     // () -> CombatComponent
+    MethodSym Unit_get_MovementComponent;   // () -> MovementComponent
+
     // Player field offsets (verified from Code.Core dump)
     size_t fld_Player_MovementModifier      = 0x180;
     size_t fld_Player_BaseMovementSpeed     = 0x184;

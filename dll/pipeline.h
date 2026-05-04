@@ -1,8 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pipeline.h  -  Feature pipeline framework.
 //
-//   A "pipeline" is a self-contained game feature (mining helper, ESP, player
-//   tweaks, ...).  Each pipeline has a lifecycle hook system:
 //
 //     OnInit()      once, after IL2CPP is up
 //     OnTick()      every frame, regardless of UI visibility (state work,
