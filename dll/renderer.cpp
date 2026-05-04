@@ -37,6 +37,7 @@ static HWND                    g_hWnd     = nullptr;
 static std::atomic<bool>       g_initOK   { false };
 static std::atomic<bool>       g_visible  { true };
 static FrameCallback           g_frameCb;
+static FrameCallback           g_tickCb;
 static int                     g_vpW = 0, g_vpH = 0;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -165,6 +166,14 @@ static HRESULT STDMETHODCALLTYPE HookedPresent(IDXGISwapChain* sc, UINT syncInte
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     }
 
+    // Background tick: ALWAYS runs (even when overlay is hidden via INSERT)
+    // so feature state work keeps happening when the user wants the UI
+    // out of the way.  No ImGui frame is open here.
+    if (g_initOK.load() && g_tickCb) {
+        __try { g_tickCb(); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { /* swallow */ }
+    }
+
     return g_origPresent(sc, syncInterval, flags);
 }
 
@@ -249,9 +258,11 @@ void Uninstall() {
     if (g_dev) { g_dev->Release(); g_dev = nullptr; }
     g_initOK = false;
     g_frameCb = {};
+    g_tickCb  = {};
 }
 
 void SetFrameCallback(FrameCallback cb) { g_frameCb = std::move(cb); }
+void SetTickCallback(FrameCallback cb)  { g_tickCb  = std::move(cb); }
 bool IsVisible()                        { return g_visible.load(); }
 void SetVisible(bool v)                 { g_visible = v; }
 void GetViewportSize(int& w, int& h)    { w = g_vpW; h = g_vpH; }

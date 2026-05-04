@@ -19,6 +19,11 @@ void Uninstall();
 using FrameCallback = std::function<void()>;
 void SetFrameCallback(FrameCallback cb);
 
+// Background tick callback.  Always called inside Present() regardless of
+// overlay visibility, OUTSIDE the ImGui frame.  Use for state work that has
+// to keep running while the user has the UI hidden (auto-loot, refills, ...).
+void SetTickCallback(FrameCallback cb);
+
 // Whether the overlay is currently visible (INSERT toggles).
 bool IsVisible();
 void SetVisible(bool v);

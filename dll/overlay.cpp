@@ -61,9 +61,14 @@ static void DrawSidebar(const std::vector<pipeline::Feature*>& feats) {
     ImGui::EndChild();
 }
 
-void Render() {
-    // Pipeline lifecycle every frame
+void Tick() {
+    // Always-on: feature state work (auto-loot pulses, mana refill, ...).
     pipeline::TickAll();
+}
+
+void Render() {
+    // World overlays are part of the visual UI -- only when the dev
+    // overlay is visible do we draw the foreground stuff.
     pipeline::RenderWorldAll();
 
     if (!renderer::IsVisible()) return;

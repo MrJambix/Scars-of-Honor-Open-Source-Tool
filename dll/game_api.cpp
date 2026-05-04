@@ -100,6 +100,7 @@ bool Resolve() {
     ResolveClass(A.movementComponent,          "World.Components",                         "MovementComponent");
     ResolveClass(A.combatComponent,            "World.Components",                         "CombatComponent");
     ResolveClass(A.unitStats,                  "World.Components",                         "UnitStats");
+    ResolveClass(A.resourcesComponent,         "World.Components",                         "ResourcesComponent");
 
     ResolveClass(A.resourceNode,               "World.MiniGame",                           "ResourceNodePrefabController");
 
@@ -111,8 +112,14 @@ bool Resolve() {
 
     ResolveClass(A.interactionManager,         "",                                         "InteractionManager");
     ResolveClass(A.interaction,                "",                                         "Interaction");
+    ResolveClass(A.interactionComponent,       "",                                         "InteractionComponent");
+    ResolveClass(A.spellUtilities,             "",                                         "SpellUtilities");
+    ResolveClass(A.veNode,                     "VibraniumEngine.Nodes",                    "VENode");
+    ResolveClass(A.spellsDatabase,             "",                                         "SpellsDatabase");
+    ResolveClass(A.spellTemplate,              "Source.Scripts.World.Spells",              "SpellTemplate");
 
     ResolveClass(A.spellCooldownResolver,      "Source.Scripts.World.Spells",              "SpellCooldownReductionResolver");
+    ResolveClass(A.talentsModelSO,             "Talents.UI",                               "UiDataTalentsModelSO");
     ResolveClass(A.playerSkillListView,        "Source.Scripts.World.Skills.UI",           "PlayerSkillListView");
     ResolveClass(A.uiViewSkillCategoriesView,  "Source.Scripts.World.Skills.UI",           "UIViewSkillCategoriesView");
     ResolveClass(A.uiViewSkillList,            "Source.Scripts.World.Skills.UI",           "UIViewSkillList");
@@ -156,8 +163,23 @@ bool Resolve() {
 
     ResolveMethod(A.IM_CheckForInteract,        A.interactionManager,
                   "InteractionManager.CheckForInteract",           "CheckForInteract", 1);
+    ResolveMethod(A.IM_get_InteractableComponentInRange, A.interactionManager,
+                  "InteractionManager.get_InteractableComponentInRange",
+                  "get_InteractableComponentInRange", 0);
+    ResolveMethod(A.IM_InteractionObjectHit,    A.interactionManager,
+                  "InteractionManager.InteractionObjectHit",       "InteractionObjectHit", 2);
+    ResolveMethod(A.IC_InteractStart,           A.interactionComponent,
+                  "InteractionComponent.InteractStart",            "InteractStart", 2);
     ResolveMethod(A.Interaction_IsAvailableForPlayer, A.interaction,
                   "Interaction.IsAvailableForPlayer",              "IsAvailableForPlayer", 1);
+    ResolveMethod(A.Interaction_GetId,          A.interaction,
+                  "Interaction.GetId",                             "GetId", 0);
+    ResolveMethod(A.SU_get_InteractionManager,  A.spellUtilities,
+                  "SpellUtilities.get_InteractionManager",         "get_InteractionManager", 0);
+    ResolveMethod(A.VENode_GetGuid,             A.veNode,
+                  "VENode.GetGuid",                                "GetGuid", 0);
+    ResolveMethod(A.SpellsDatabase_get_Spells,  A.spellsDatabase,
+                  "SpellsDatabase.get_Spells",                     "get_Spells", 0);
 
     ResolveMethod(A.SCR_GetCooldownReductionMs, A.spellCooldownResolver,
                   "SpellCooldownReductionResolver.GetCooldownReductionMilliseconds",
@@ -180,9 +202,12 @@ bool Resolve() {
         &A.playerMoveController, &A.localPlayerMoveController, &A.remotePlayerMoveController,
         &A.playerCameraController, &A.playerCombatController, &A.playerInputController,
         &A.playerMountController, &A.basicAttackController, &A.masterAnimController,
-        &A.movementComponent, &A.combatComponent, &A.unitStats, &A.resourceNode,
+        &A.movementComponent, &A.combatComponent, &A.unitStats, &A.resourcesComponent, &A.resourceNode,
         &A.characterSelectionManager, &A.classSO, &A.raceModelSO, &A.classButton, &A.raceToggle,
-        &A.interactionManager, &A.interaction, &A.spellCooldownResolver,
+        &A.interactionManager, &A.interaction, &A.interactionComponent,
+        &A.spellUtilities, &A.veNode, &A.spellsDatabase, &A.spellTemplate,
+        &A.spellCooldownResolver,
+        &A.talentsModelSO,
         &A.playerSkillListView, &A.uiViewSkillCategoriesView, &A.uiViewSkillList,
         &A.unityComponent, &A.unityTransform,
     };
@@ -195,7 +220,9 @@ bool Resolve() {
         &A.ClassSO_IsLockedForRace, &A.RaceModelSO_get_Locked,
         &A.ClassButton_CheckIsLockedForRace, &A.ClassButton_IsInteractable,
         &A.RaceToggle_IsInteractable,
-        &A.IM_CheckForInteract, &A.Interaction_IsAvailableForPlayer,
+        &A.IM_CheckForInteract, &A.IM_get_InteractableComponentInRange, &A.IM_InteractionObjectHit,
+        &A.IC_InteractStart, &A.Interaction_IsAvailableForPlayer, &A.Interaction_GetId,
+        &A.SU_get_InteractionManager, &A.VENode_GetGuid, &A.SpellsDatabase_get_Spells,
         &A.SCR_GetCooldownReductionMs,
         &A.PSLV_IsLockedByRank, &A.UVSCV_IsLockedByRank, &A.UVSL_IsLockedByRank,
         &A.Component_get_transform, &A.Transform_get_position, &A.Transform_set_position,
@@ -232,6 +259,32 @@ void Reresolve() {
     fresh.fld_Node_MiniGameType             = g_api.fld_Node_MiniGameType;
     fresh.fld_Node_IsDead                   = g_api.fld_Node_IsDead;
     fresh.fld_Node_Percentage               = g_api.fld_Node_Percentage;
+    fresh.fld_IC_interactions               = g_api.fld_IC_interactions;
+    fresh.fld_IC_ownerObject                = g_api.fld_IC_ownerObject;
+    fresh.fld_Interaction_id                = g_api.fld_Interaction_id;
+    fresh.fld_VENode_guid                   = g_api.fld_VENode_guid;
+    fresh.fld_Spell_id                      = g_api.fld_Spell_id;
+    fresh.fld_Spell_channel_time            = g_api.fld_Spell_channel_time;
+    fresh.fld_Spell_cast_time               = g_api.fld_Spell_cast_time;
+    fresh.fld_Spell_cooldown                = g_api.fld_Spell_cooldown;
+    fresh.fld_Spell_anim_lock_delay         = g_api.fld_Spell_anim_lock_delay;
+    fresh.fld_Spell_globalcooldown          = g_api.fld_Spell_globalcooldown;
+    fresh.fld_List_items                    = g_api.fld_List_items;
+    fresh.fld_List_size                     = g_api.fld_List_size;
+    fresh.fld_Array_data                    = g_api.fld_Array_data;
+    fresh.fld_RC_resources                  = g_api.fld_RC_resources;
+    fresh.fld_RC_guid                       = g_api.fld_RC_guid;
+    fresh.fld_RC_unit                       = g_api.fld_RC_unit;
+    fresh.resourceStruct_stride             = g_api.resourceStruct_stride;
+    fresh.fld_Resource_id                   = g_api.fld_Resource_id;
+    fresh.fld_Resource_current              = g_api.fld_Resource_current;
+    fresh.fld_Resource_max                  = g_api.fld_Resource_max;
+    fresh.fld_Resource_orderId              = g_api.fld_Resource_orderId;
+    fresh.fld_Resource_isActive             = g_api.fld_Resource_isActive;
+    fresh.fld_Spell_max_range               = g_api.fld_Spell_max_range;
+    fresh.fld_Talents_available             = g_api.fld_Talents_available;
+    fresh.fld_Talents_spent                 = g_api.fld_Talents_spent;
+    fresh.fld_Talents_refund                = g_api.fld_Talents_refund;
     g_api = fresh;
     Resolve();
 }

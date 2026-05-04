@@ -47,6 +47,19 @@ static void SendMouseLeft() {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  1. Mining helper
+//
+//  How it reads the QTE state:
+//    * UiViewMiniGameMining is a MonoBehaviour, so FindObjectsOfType works.
+//    * MiningGameDataModel is a *plain System.Object* (not UnityEngine.Object),
+//      so it is NOT findable via FindObjectsOfType -- the previous version of
+//      this helper relied on that and silently no-op'd.  We now read the
+//      hit-zone and crit-zone Image components straight from the view and
+//      compute the bar-space coordinates from their RectTransform fields.
+//
+//  View layout (Code.Core, verified against 20260503_220921 dump):
+//      0x90 _hitZone           UnityEngine.UI.Image
+//      0x98 _critStrikeZone    UnityEngine.UI.Image
+//      0xB8 _handleRectTransform   RectTransform
 // ════════════════════════════════════════════════════════════════════════════
 class MiningHelperFeature : public pipeline::Feature {
 public:
@@ -57,71 +70,115 @@ public:
     bool  showVisual    = true;
     bool  autoPress     = false;
     float predictMs     = 60.0f;
-    int   inputMode     = 0;          // 0 = LMB, 1 = 'E'    (proper int — fixed)
+    int   inputMode     = 0;          // 0 = LMB, 1 = 'E'
 
     // ── Counters ──
     int   crits = 0, hits = 0, misses = 0;
 
     // ── Cached IL2CPP refs ──
-    Il2CppClass*       clsView    = nullptr;
-    Il2CppClass*       clsModel   = nullptr;
-    Il2CppClass*       clsRect    = nullptr;
-    const MethodInfo*  mAnchored  = nullptr;
+    Il2CppClass*       clsView      = nullptr;
+    Il2CppClass*       clsRect      = nullptr;
+    Il2CppClass*       clsComponent = nullptr;
+    const MethodInfo*  mAnchored    = nullptr;   // RectTransform.get_anchoredPosition
+    const MethodInfo*  mSizeDelta   = nullptr;   // RectTransform.get_sizeDelta
+    const MethodInfo*  mGetTransform= nullptr;   // Component.get_transform
 
     // ── Sample state ──
     DWORD  lastTick   = 0;
     float  lastX      = 0.0f;
     float  velocity   = 0.0f;
     bool   pressedThisCycle = false;
-    DWORD  lastResolveTick = 0;     // throttle FindFirstObjectOfType
-    void*  cachedView  = nullptr;
-    void*  cachedModel = nullptr;
+    DWORD  lastResolveTick  = 0;     // throttle FindFirstObjectOfType
+    void*  cachedView       = nullptr;
 
-    struct Sample { bool ok=false; float x=0, crit=0, hit=0, critZone=0, vel=0; };
+    struct Sample { bool ok=false; float x=0, crit=0, hit=0, critZone=0, vel=0; const char* err=""; };
     Sample latest;
 
-    // Field offsets (from dump, Code.Core.dll)
-    static constexpr size_t kView_HandleRect   = 0xB8;
-    static constexpr size_t kModel_CritPoint   = 0x38;
-    static constexpr size_t kModel_HitZone     = 0x3C;
-    static constexpr size_t kModel_CritZone    = 0x40;
+    // Field offsets (Code.Core.dll, verified)
+    static constexpr size_t kView_HitZoneImage   = 0x90;  // UI.Image
+    static constexpr size_t kView_CritZoneImage  = 0x98;  // UI.Image
+    static constexpr size_t kView_HandleRect     = 0xB8;  // RectTransform
 
     void OnInit() override {
-        clsView  = FindClass("World.MiniGame.UI", "UiViewMiniGameMining");
-        clsModel = FindClass("World.MiniGame", "MiningGameDataModel");
-        clsRect  = FindClass("UnityEngine", "RectTransform");
-        if (clsRect) mAnchored = GetMethod(clsRect, "get_anchoredPosition", 0);
+        clsView      = FindClass("World.MiniGame.UI", "UiViewMiniGameMining");
+        clsRect      = FindClass("UnityEngine", "RectTransform");
+        clsComponent = FindClass("UnityEngine", "Component");
+        if (clsRect) {
+            mAnchored  = GetMethod(clsRect, "get_anchoredPosition", 0);
+            mSizeDelta = GetMethod(clsRect, "get_sizeDelta",        0);
+        }
+        if (clsComponent) mGetTransform = GetMethod(clsComponent, "get_transform", 0);
+    }
+
+    // Read a Vector2 from a 0-arg getter on the given object (e.g. RectTransform).
+    // Returns true if both components were unboxed successfully.
+    bool ReadVector2(const MethodInfo* getter, void* obj, float& outX, float& outY) {
+        if (!getter || !obj) return false;
+        void* boxed = nullptr;
+        __try { boxed = Invoke(getter, obj, nullptr); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+        if (!boxed) return false;
+        auto& a = GetApi();
+        void* raw = a.object_unbox ? a.object_unbox(boxed) : boxed;
+        if (!raw) return false;
+        __try {
+            outX = ((float*)raw)[0];
+            outY = ((float*)raw)[1];
+        } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+        return true;
+    }
+
+    // Image -> RectTransform (Image is a Component, its transform IS the RectTransform).
+    void* RectOfImage(void* image) {
+        if (!image || !mGetTransform) return nullptr;
+        __try { return Invoke(mGetTransform, image, nullptr); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
     }
 
     Sample Sample_() {
         Sample s{};
-        if (!clsView || !clsModel || !mAnchored) return s;
+        if (!clsView)       { s.err = "clsView null";      return s; }
+        if (!mAnchored)     { s.err = "no anchoredPos";    return s; }
+        if (!mSizeDelta)    { s.err = "no sizeDelta";      return s; }
+        if (!mGetTransform) { s.err = "no get_transform";  return s; }
 
-        // Re-resolve view/model only every 500 ms; FindObjectsOfType is
-        // extremely expensive (linear scan over every Unity Object).  We cache
-        // even null results so the helper costs nothing while the mining UI
-        // is closed.
+        // Re-resolve the view only every 500 ms (FindObjectsOfType is expensive).
         DWORD now = GetTickCount();
         if ((now - lastResolveTick) > 500) {
-            cachedView  = FindFirstObjectOfType(clsView);
-            cachedModel = FindFirstObjectOfType(clsModel);
+            cachedView = FindFirstObjectOfType(clsView);
             lastResolveTick = now;
         }
-        void* view  = cachedView;
-        void* model = cachedModel;
-        if (!view || !model) return s;
-        void* rect = *reinterpret_cast<void**>((char*)view + kView_HandleRect);
-        if (!rect) return s;
-        void* boxed = Invoke(mAnchored, rect, nullptr);
-        if (!boxed) return s;
-        auto& a = GetApi();
-        void* raw = a.object_unbox ? a.object_unbox(boxed) : boxed;
-        if (!raw) return s;
+        void* view = cachedView;
+        if (!view) { s.err = "view not active"; return s; }
 
-        s.x        = ((float*)raw)[0];
-        s.crit     = *reinterpret_cast<float*>((char*)model + kModel_CritPoint);
-        s.hit      = *reinterpret_cast<float*>((char*)model + kModel_HitZone);
-        s.critZone = *reinterpret_cast<float*>((char*)model + kModel_CritZone);
+        // Read handle position
+        void* handleRect = *reinterpret_cast<void**>((char*)view + kView_HandleRect);
+        if (!handleRect) { s.err = "handleRect null"; return s; }
+        float hX = 0, hY = 0;
+        if (!ReadVector2(mAnchored, handleRect, hX, hY)) { s.err = "read handle"; return s; }
+
+        // Read hit zone image -> rectTransform anchoredPosition + sizeDelta
+        void* hitImg  = *reinterpret_cast<void**>((char*)view + kView_HitZoneImage);
+        void* critImg = *reinterpret_cast<void**>((char*)view + kView_CritZoneImage);
+        void* hitRect  = RectOfImage(hitImg);
+        void* critRect = RectOfImage(critImg);
+        if (!hitRect || !critRect) { s.err = "no zone rect"; return s; }
+
+        float hitCx = 0, hitCy = 0, hitW = 0, hitH = 0;
+        float crtCx = 0, crtCy = 0, crtW = 0, crtH = 0;
+        if (!ReadVector2(mAnchored,  hitRect,  hitCx, hitCy)) { s.err = "hit anchor";  return s; }
+        if (!ReadVector2(mSizeDelta, hitRect,  hitW,  hitH))  { s.err = "hit size";    return s; }
+        if (!ReadVector2(mAnchored,  critRect, crtCx, crtCy)) { s.err = "crit anchor"; return s; }
+        if (!ReadVector2(mSizeDelta, critRect, crtW,  crtH))  { s.err = "crit size";   return s; }
+
+        // Pick the dominant axis (mining uses an arc -- one axis dominates).
+        // Default to X; if the hit-zone width is collapsed but height is large,
+        // switch to Y so the math keeps working.
+        bool useY = (hitW < 4.0f) && (hitH >= 4.0f);
+        s.x        = useY ? hY    : hX;
+        s.crit     = useY ? crtCy : crtCx;
+        s.hit      = useY ? (hitH * 0.5f) : (hitW * 0.5f);
+        s.critZone = useY ? (crtH * 0.5f) : (crtW * 0.5f);
 
         DWORD dt = now - lastTick;
         if (lastTick && dt > 0 && dt < 200) {
@@ -219,10 +276,13 @@ public:
 
         ImGui::Separator();
         if (ImGui::CollapsingHeader("Live sample")) {
-            ImGui::Text("ok=%d  x=%.2f  v=%.1f", latest.ok, latest.x, latest.vel);
+            ImGui::Text("ok=%d  err=%s", latest.ok, latest.err && *latest.err ? latest.err : "-");
+            ImGui::Text("x=%.2f  v=%.1f", latest.x, latest.vel);
             ImGui::Text("crit=%.2f  hit=%.2f  critZone=%.2f",
                         latest.crit, latest.hit, latest.critZone);
-            ImGui::Text("View=%p Model=%p", (void*)clsView, (void*)clsModel);
+            ImGui::Text("View cls=%p  cachedView=%p", (void*)clsView, cachedView);
+            ImGui::Text("get_anchoredPosition=%p  get_sizeDelta=%p  Component.get_transform=%p",
+                        (void*)mAnchored, (void*)mSizeDelta, (void*)mGetTransform);
         }
     }
 };

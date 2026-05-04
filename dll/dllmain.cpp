@@ -132,6 +132,7 @@ static DWORD WINAPI PayloadThread(LPVOID) {
     overlay::Init();
     if (renderer::Install()) {
         renderer::SetFrameCallback([] { overlay::Render(); });
+        renderer::SetTickCallback ([] { overlay::Tick();   });
         LOGI("overlay armed (press INSERT in-game)");
         printf("  [+] Overlay armed.  Press INSERT in-game.\n");
     } else {

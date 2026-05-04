@@ -90,6 +90,7 @@ public:
             DrawClassRow(A.movementComponent);
             DrawClassRow(A.combatComponent);
             DrawClassRow(A.unitStats);
+            DrawClassRow(A.resourcesComponent);
             DrawClassRow(A.resourceNode);
             DrawClassRow(A.characterSelectionManager);
             DrawClassRow(A.classSO);
@@ -98,7 +99,13 @@ public:
             DrawClassRow(A.raceToggle);
             DrawClassRow(A.interactionManager);
             DrawClassRow(A.interaction);
+            DrawClassRow(A.interactionComponent);
+            DrawClassRow(A.spellUtilities);
+            DrawClassRow(A.veNode);
+            DrawClassRow(A.spellsDatabase);
+            DrawClassRow(A.spellTemplate);
             DrawClassRow(A.spellCooldownResolver);
+            DrawClassRow(A.talentsModelSO);
             DrawClassRow(A.playerSkillListView);
             DrawClassRow(A.uiViewSkillCategoriesView);
             DrawClassRow(A.uiViewSkillList);
@@ -128,7 +135,14 @@ public:
             DrawMethodRow(A.ClassButton_IsInteractable);
             DrawMethodRow(A.RaceToggle_IsInteractable);
             DrawMethodRow(A.IM_CheckForInteract);
+            DrawMethodRow(A.IM_get_InteractableComponentInRange);
+            DrawMethodRow(A.IM_InteractionObjectHit);
+            DrawMethodRow(A.IC_InteractStart);
             DrawMethodRow(A.Interaction_IsAvailableForPlayer);
+            DrawMethodRow(A.Interaction_GetId);
+            DrawMethodRow(A.SU_get_InteractionManager);
+            DrawMethodRow(A.VENode_GetGuid);
+            DrawMethodRow(A.SpellsDatabase_get_Spells);
             DrawMethodRow(A.SCR_GetCooldownReductionMs);
             DrawMethodRow(A.PSLV_IsLockedByRank);
             DrawMethodRow(A.UVSCV_IsLockedByRank);
@@ -154,6 +168,20 @@ public:
             ImGui::Text("ResourceNode.MiniGameType    = 0x%03zX", A.fld_Node_MiniGameType);
             ImGui::Text("ResourceNode.IsDead          = 0x%03zX", A.fld_Node_IsDead);
             ImGui::Text("ResourceNode.Percentage      = 0x%03zX", A.fld_Node_Percentage);
+            ImGui::Separator();
+            ImGui::Text("InteractionComponent.interactions = 0x%03zX", A.fld_IC_interactions);
+            ImGui::Text("InteractionComponent.ownerObject  = 0x%03zX", A.fld_IC_ownerObject);
+            ImGui::Text("VENode.guid                       = 0x%03zX", A.fld_VENode_guid);
+            ImGui::Separator();
+            ImGui::Text("SpellTemplate.id              = 0x%03zX", A.fld_Spell_id);
+            ImGui::Text("SpellTemplate.channel_time    = 0x%03zX (ms)", A.fld_Spell_channel_time);
+            ImGui::Text("SpellTemplate.cast_time       = 0x%03zX (ms)", A.fld_Spell_cast_time);
+            ImGui::Text("SpellTemplate.cooldown        = 0x%03zX (ms)", A.fld_Spell_cooldown);
+            ImGui::Text("SpellTemplate.anim_lock_delay = 0x%03zX (ms)", A.fld_Spell_anim_lock_delay);
+            ImGui::Text("SpellTemplate.globalcooldown  = 0x%03zX (ms)", A.fld_Spell_globalcooldown);
+            ImGui::Separator();
+            ImGui::Text("List<T>._items / ._size       = 0x%03zX / 0x%03zX", A.fld_List_items, A.fld_List_size);
+            ImGui::Text("T[].vector start              = 0x%03zX", A.fld_Array_data);
         }
     }
 };
