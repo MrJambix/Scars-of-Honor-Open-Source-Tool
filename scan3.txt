@@ -1,0 +1,8 @@
+﻿TOTAL=7
+Entities.Unit :: get_MoveSpeedMultiplier() -> System.Single   // ptr=00007FFEDA36CFF0  RVA=0x113CFF0
+UI.IUISlotHasCooldown :: get_cooldownComponent() -> UI.UISlotCooldown   // ptr=00007FFED98F45B0  RVA=0x6C45B0
+UI.UIActionBarSlot :: get_cooldownComponent() -> UI.UISlotCooldown   // ptr=00007FFEDA3A3FC0  RVA=0x1173FC0
+UI.UISpellSlot :: get_cooldownComponent() -> UI.UISlotCooldown   // ptr=00007FFEDA3A3FD0  RVA=0x1173FD0
+UI.Tooltips.UiSettingsTooltips :: get_CooldownFormat() -> System.String   // ptr=00007FFED9BC6FB0  RVA=0x996FB0
+UI.Tooltips.UiSettingsTooltips :: get_RangeFormat() -> System.String   // ptr=00007FFED9BC6FC0  RVA=0x996FC0
+Source.Scripts.World.Spells.SpellCooldownReductionResolver :: static GetCooldownReductionMilliseconds(System.UInt32 spellId, World.Components.CombatComponent combatComponent) -> System.UInt32   // ptr=00007FFEDA67F030  RVA=0x144F030

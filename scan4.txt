@@ -1,0 +1,4 @@
+﻿TOTAL=3
+Entities.Npc :: IsHostile(Entities.Unit unit) -> System.Boolean   // ptr=00007FFEDA3173C0  RVA=0x10E73C0
+Entities.Unit :: IsHostileTowards(System.UInt64 guid) -> System.Boolean   // ptr=00007FFEDA36AAA0  RVA=0x113AAA0
+Entities.Unit :: IsHostile(Entities.Unit unit) -> System.Boolean   // ptr=00007FFEDA36AB30  RVA=0x113AB30

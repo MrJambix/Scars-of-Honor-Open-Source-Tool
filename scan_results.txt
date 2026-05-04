@@ -1,0 +1,31 @@
+﻿TOTAL=30
+UiViewMountFrame :: get_HealthBarFill() -> UnityEngine.UI.Image   // ptr=00007FFED9BC6FB0  RVA=0x996FB0
+UiViewMountInteractionMenu :: get_ManageInventoryButton() -> UnityEngine.UI.Button   // ptr=00007FFED9C17A80  RVA=0x9E7A80
+UiViewMountInteractionMenu :: get_ManageInventoryButtonLocalization() -> UnityEngine.Localization.Components.LocalizeStringEvent   // ptr=00007FFED9CFE710  RVA=0xACE710
+Interaction :: IsAvailableForPlayer(Entities.Player player) -> System.Boolean   // ptr=00007FFEDA293E30  RVA=0x1063E30
+ContinentStreamingManager :: get_Manager() -> ContinentDataManager   // ptr=00007FFEDA2A8360  RVA=0x1078360
+ZoneTrigger :: get_Manager() -> EnvironmentManager   // ptr=00007FFEDA2F35F0  RVA=0x10C35F0
+Entities.WaterNavAgent :: get_Speed() -> System.Single   // ptr=00007FFED9C985D0  RVA=0xA685D0
+Entities.MasterAnimatorController :: get_SpeedMultiplier() -> System.Single   // ptr=00007FFEDA338710  RVA=0x1108710
+Entities.PlayerMoveController :: GetMoveSpeed() -> System.Single   // ptr=00007FFEDA349BB0  RVA=0x1119BB0
+NotificationVisualPreset :: get_SpeedupRateWhenQueued() -> System.Single   // ptr=00007FFEDA2ED360  RVA=0x10BD360
+WorldObjectData.UnitData :: GetMaxHealth() -> System.UInt32   // ptr=00007FFED9B910F0  RVA=0x9610F0
+World.Stables.UI.UiViewMountDetails :: get_StaminaText() -> TMPro.TextMeshProUGUI   // ptr=00007FFED9C6A7C0  RVA=0xA3A7C0
+World.Stables.UI.UiViewMountDetails :: get_SpeedText() -> TMPro.TextMeshProUGUI   // ptr=00007FFED9C6A7D0  RVA=0xA3A7D0
+World.Stables.UI.UiViewMountDetails :: get_StaminaTooltipReceiver() -> Utils.UI.PressReleaseButton   // ptr=00007FFED9C20660  RVA=0x9F0660
+World.Stables.UI.UiViewMountDetails :: get_SpeedTooltipReceiver() -> Utils.UI.PressReleaseButton   // ptr=00007FFED9B90F30  RVA=0x960F30
+World.Stables.UI.UiViewMountDetails :: get_StaminaDescription() -> System.String   // ptr=00007FFED9C8BCB0  RVA=0xA5BCB0
+World.Stables.UI.UiViewMountDetails :: get_SpeedDescription() -> System.String   // ptr=00007FFED9C8B7B0  RVA=0xA5B7B0
+World.MiniGame.DirectionChange :: get_Speed() -> System.Single   // ptr=00007FFED9C0C8B0  RVA=0x9DC8B0
+World.MiniGame.MarkerMovement :: get_Speed() -> System.Single   // ptr=00007FFED9C0C8B0  RVA=0x9DC8B0
+World.MiniGame.MiniGameDataModel :: get_HealthData() -> World.MiniGame.HealthData   // ptr=00007FFED9BC69A0  RVA=0x9969A0
+World.MiniGame.RoundFinishedData :: get_HealthData() -> World.MiniGame.IHealthData   // ptr=00007FFED9B910D0  RVA=0x9610D0
+World.MiniGame.IGameData :: get_HealthData() -> World.MiniGame.HealthData   // ptr=00007FFED98F45B0  RVA=0x6C45B0
+ModelManagerNamespace.ClassSO :: IsLockedForRace(Defines.GameRace race) -> System.Boolean   // ptr=00007FFEDA627580  RVA=0x13F7580
+ModelManagerNamespace.ModelManager :: GetArmoryItem(System.Int32 itemId, Defines.GameRace race, Defines.GameGender gender) -> ModelManagerNamespace.ArmoryItemSO   // ptr=00007FFEDA62AE80  RVA=0x13FAE80
+ModelManagerNamespace.ModelManager :: GetArmoryItem(System.Int32 itemId) -> ModelManagerNamespace.ArmoryItemSO   // ptr=00007FFEDA62ACC0  RVA=0x13FACC0
+ModelManagerNamespace.Test.TestSceneCharacterController :: get_SpeedMultiplier() -> System.Single   // ptr=00007FFEDA6576A0  RVA=0x14276A0
+Source.Scripts.World.Skills.UI.PlayerSkillListView :: IsLockedByRank(Source.Scripts.World.Spells.SpellTemplate skillInfo) -> System.Boolean   // ptr=00007FFEDA660120  RVA=0x1430120
+Source.Scripts.World.Skills.UI.UIViewSkillCategoriesView :: IsLockedByRank(Source.Scripts.World.Spells.SpellTemplate skillInfo) -> System.Boolean   // ptr=00007FFEDA660120  RVA=0x1430120
+Source.Scripts.World.Skills.UI.UIViewSkillList :: IsLockedByRank(Source.Scripts.World.Spells.SpellTemplate skillInfo) -> System.Boolean   // ptr=00007FFEDA660120  RVA=0x1430120
+Source.Scripts.Common.Signals.SignalCharacterSpeedChange :: get_SpeedModifier() -> System.Single   // ptr=00007FFED9C0C8C0  RVA=0x9DC8C0

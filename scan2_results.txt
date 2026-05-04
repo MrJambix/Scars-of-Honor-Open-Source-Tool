@@ -1,0 +1,21 @@
+﻿TOTAL=20
+InteractionManager :: CheckForInteract(Entities.VEGameObject veGameObject) -> System.Boolean   // ptr=00007FFEDA3927B0  RVA=0x11627B0
+UiScenePoolItems :: CheckPoolItemsForUniqueness(System.String& errorMessage) -> System.Boolean   // ptr=00007FFEDA3A1D00  RVA=0x1171D00
+PlanarReflectionsProbe :: CheckCamera(UnityEngine.Camera cam) -> System.Boolean   // ptr=00007FFEDA496100  RVA=0x1266100
+DetailAutoPainter :: validateRegion(System.Collections.Generic.List<System.Int32> zones, System.Single x, System.Single z, System.Int32 detailID) -> System.Boolean   // ptr=00007FFEDA2AB900  RVA=0x107B900
+VibraniumKCC.VibraniumKCCMotor :: CheckStepValidity(System.Int32 nbStepHits, UnityEngine.Vector3 characterPosition, UnityEngine.Quaternion characterRotation, UnityEngine.Vector3 innerHitDirection, UnityEngine.Vector3 stepCheckStartPos, UnityEngine.Collider& hitCollider) -> System.Boolean   // ptr=00007FFEDA3CDEC0  RVA=0x119DEC0
+VibraniumKCC.VibraniumKCCMotor :: CheckIfColliderValidForCollisions(UnityEngine.Collider coll) -> System.Boolean   // ptr=00007FFEDA3CDD90  RVA=0x119DD90
+UI.UiSceneModel :: CheckAddToShowQueue(LobbyWindowOpenCloseData data) -> System.Boolean   // ptr=00007FFEDA42F250  RVA=0x11FF250
+UI.UiSceneModel :: CheckInited() -> System.Boolean   // ptr=00007FFEDA42F2E0  RVA=0x11FF2E0
+UI.UIEquipSlot :: CheckEquipType(UI.UIItemInfo info) -> System.Boolean   // ptr=00007FFEDA426050  RVA=0x11F6050
+UI.CharacterSelection.ClassButton :: CheckIsLockedForRace(Defines.GameRace race) -> System.Boolean   // ptr=00007FFEDA460DC0  RVA=0x1230DC0
+World.Stables.UI.UiMountEquipSlot :: CheckEquipType(UI.UIItemInfo info) -> System.Boolean   // ptr=00007FFEDA548EA0  RVA=0x1318EA0
+World.Spells.UI.UiPresenterSpellBookElement :: CheckAvailable() -> System.Boolean   // ptr=00007FFEDA551320  RVA=0x1321320
+World.Match.UI.UiPresenterMatchHudBase`1 :: CheckVisibility(Defines.GameMatchMode matchMode, World.Match.MatchState matchState) -> System.Boolean   // ptr=0000000000000000
+World.ActionBar.Ui.ActionSlotSystemModel :: CheckPermissionToUseSlot() -> System.Boolean   // ptr=00007FFEDA60BD70  RVA=0x13DBD70
+World.ActionBar.Ui.UiPresenterActionSlotBase`1 :: CheckCorrectSlotType(ActionButton sourceActionButton) -> System.Boolean   // ptr=0000000000000000
+World.ActionBar.Ui.UiPresenterActionSlotBase`1 :: CheckUsableState(System.Boolean isSilent) -> System.Boolean   // ptr=00007FFED9910F30  RVA=0x6E0F30
+World.ActionBar.Ui.UiPresenterActionSlotBase`1 :: CheckReleasableState() -> System.Boolean   // ptr=00007FFED98F51E0  RVA=0x6C51E0
+World.ActionBar.Ui.UiPresenterSlotDashElement :: CheckCorrectSlotType(ActionButton sourceActionButton) -> System.Boolean   // ptr=00007FFED9BCA3C0  RVA=0x99A3C0
+World.ActionBar.Ui.UiPresenterSlotPotionElement :: CheckCorrectSlotType(ActionButton sourceActionButton) -> System.Boolean   // ptr=00007FFEDA620720  RVA=0x13F0720
+World.ActionBar.Ui.UiPresenterSlotSpellElement :: CheckCorrectSlotType(ActionButton sourceActionButton) -> System.Boolean   // ptr=00007FFEDA621120  RVA=0x13F1120
